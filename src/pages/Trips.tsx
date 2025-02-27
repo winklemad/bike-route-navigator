@@ -1,8 +1,8 @@
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Clock, ArrowRight, Filter, ChevronDown, Bike } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,46 +13,49 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface Trip {
+  id: number;
+  name: string;
+  description: string;
+  distance: string;
+  duration: string;
+  difficulty: string;
+  createdAt: string;
+  previewImageUrl: string;
+}
+
 const Trips = () => {
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterDifficulty, setFilterDifficulty] = useState<string | null>(null);
   
-  const mockTrips = [
-    {
-      id: 1,
-      name: 'City Park Loop',
-      description: 'A scenic ride through downtown parks',
-      distance: '5.2 km',
-      duration: '30 min',
-      difficulty: 'Easy',
-      createdAt: '2023-06-15T14:30:00Z',
-      previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+3b82f6(-122.4194,37.7749)/[-122.4194,37.7749,13]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg'
-    },
-    {
-      id: 2,
-      name: 'Mountain Trail',
-      description: 'Challenging mountain bike trail with great views',
-      distance: '12.8 km',
-      duration: '1.5 hrs',
-      difficulty: 'Hard',
-      createdAt: '2023-06-12T09:15:00Z',
-      previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+3b82f6(-122.3,37.8)/[-122.3,37.8,11]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg'
-    },
-    {
-      id: 3,
-      name: 'Coastal Ride',
-      description: 'Beautiful ocean views along the coastline',
-      distance: '8.5 km',
-      duration: '45 min',
-      difficulty: 'Moderate',
-      createdAt: '2023-06-10T16:45:00Z',
-      previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+3b82f6(-122.5,37.7)/[-122.5,37.7,12]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg'
-    },
-  ];
+  // Fetch trips on component mount
+  useEffect(() => {
+    const fetchTrips = async () => {
+      try {
+        const response = await fetch('/api/trips');
+        if (response.ok) {
+          const data = await response.json();
+          setTrips(data.trips);
+        } else {
+          setError('Failed to fetch trips');
+        }
+      } catch (err) {
+        setError('An error occurred while fetching trips');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchTrips();
+  }, []);
 
   // Filter trips based on selected difficulty
   const filteredTrips = filterDifficulty 
-    ? mockTrips.filter(trip => trip.difficulty === filterDifficulty)
-    : mockTrips;
+    ? trips.filter(trip => trip.difficulty === filterDifficulty)
+    : trips;
 
   return (
     <div className="min-h-screen pt-20 px-4 pb-12">
@@ -107,7 +110,25 @@ const Trips = () => {
           </div>
         </div>
 
-        {filteredTrips.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 w-1/3 bg-gray-200 mx-auto rounded-md"></div>
+              <div className="h-4 w-1/2 bg-gray-200 mx-auto rounded-md"></div>
+              <div className="h-32 w-full bg-gray-200 rounded-md"></div>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 rounded-lg border border-red-200 p-6 text-center text-red-700">
+            <p>{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-100 rounded-md hover:bg-red-200 text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : filteredTrips.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <Bike className="h-12 w-12 text-gray-400 mx-auto" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No trips found</h3>
@@ -193,7 +214,7 @@ const Trips = () => {
         
         {filteredTrips.length > 0 && (
           <div className="mt-8 text-center text-sm text-gray-500">
-            Showing {filteredTrips.length} of {mockTrips.length} trips
+            Showing {filteredTrips.length} of {trips.length} trips
             {filterDifficulty && (
               <button 
                 onClick={() => setFilterDifficulty(null)}
