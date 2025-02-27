@@ -151,8 +151,8 @@ const Create = () => {
     const mockElevation = Math.floor(pointCount * 10);
     
     let difficulty = 'Easy';
-    if (mockDistance > 10) difficulty = 'Hard';
-    else if (mockDistance > 5) difficulty = 'Moderate';
+    if (parseFloat(mockDistance) > 10) difficulty = 'Hard';
+    else if (parseFloat(mockDistance) > 5) difficulty = 'Moderate';
     
     return {
       distance: `${mockDistance} km`,
