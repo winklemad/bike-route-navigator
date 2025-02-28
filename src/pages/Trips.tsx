@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Clock, ArrowRight, Filter, ChevronDown, Bike } from 'lucide-react';
+import { MapPin, Clock, ArrowRight, Filter, ChevronDown, Bike, UserPlus, Users, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface User {
+  id: string;
+  name: string;
+}
 
 interface Trip {
   id: number;
@@ -22,6 +34,7 @@ interface Trip {
   difficulty: string;
   createdAt: string;
   previewImageUrl: string;
+  joinedUsers: User[];
 }
 
 const Trips = () => {
@@ -29,6 +42,8 @@ const Trips = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterDifficulty, setFilterDifficulty] = useState<string | null>(null);
+  const [joiningTrip, setJoiningTrip] = useState<number | null>(null);
+  const [leavingTrip, setLeavingTrip] = useState<number | null>(null);
   
   // Fetch trips on component mount
   useEffect(() => {
@@ -56,6 +71,79 @@ const Trips = () => {
   const filteredTrips = filterDifficulty 
     ? trips.filter(trip => trip.difficulty === filterDifficulty)
     : trips;
+
+  // Check if current user has joined a trip
+  const hasJoinedTrip = (trip: Trip) => {
+    return trip.joinedUsers.some(user => user.id === 'user2'); // Using our mock user ID
+  };
+
+  // Join a trip
+  const handleJoinTrip = async (tripId: number) => {
+    setJoiningTrip(tripId);
+    
+    try {
+      const response = await fetch('/api/trips/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ tripId })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Update the trip in our local state
+        setTrips(prevTrips => 
+          prevTrips.map(trip => 
+            trip.id === tripId ? data.trip : trip
+          )
+        );
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.error('Error joining trip:', error);
+      toast.error('Failed to join trip. Please try again.');
+    } finally {
+      setJoiningTrip(null);
+    }
+  };
+
+  // Leave a trip
+  const handleLeaveTrip = async (tripId: number) => {
+    setLeavingTrip(tripId);
+    
+    try {
+      const response = await fetch('/api/trips/leave', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ tripId })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Update the trip in our local state
+        setTrips(prevTrips => 
+          prevTrips.map(trip => 
+            trip.id === tripId ? data.trip : trip
+          )
+        );
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.error('Error leaving trip:', error);
+      toast.error('Failed to leave trip. Please try again.');
+    } finally {
+      setLeavingTrip(null);
+    }
+  };
 
   return (
     <div className="min-h-screen pt-20 px-4 pb-12">
@@ -174,6 +262,28 @@ const Trips = () => {
                       {trip.difficulty}
                     </span>
                   </div>
+
+                  {trip.joinedUsers.length > 0 && (
+                    <div className="absolute top-0 right-0 p-3">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-xs">
+                              <Users size={12} />
+                              <span>{trip.joinedUsers.length}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              {trip.joinedUsers.length === 1 
+                                ? '1 person joined' 
+                                : `${trip.joinedUsers.length} people joined`}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="p-4">
@@ -195,16 +305,44 @@ const Trips = () => {
                     </div>
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap justify-between items-center gap-2">
                     <span className="text-xs text-gray-500">
                       Created {new Date(trip.createdAt).toLocaleDateString()}
                     </span>
-                    <Link 
-                      to={`/trips/${trip.id}`} 
-                      className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                    >
-                      View Details
-                    </Link>
+
+                    <div className="flex items-center gap-2">
+                      <Link 
+                        to={`/trips/${trip.id}`} 
+                        className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                      >
+                        View Details
+                      </Link>
+
+                      {hasJoinedTrip(trip) ? (
+                        <button
+                          onClick={() => handleLeaveTrip(trip.id)}
+                          disabled={leavingTrip === trip.id}
+                          className="flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium hover:bg-red-100 transition-colors"
+                        >
+                          {leavingTrip === trip.id ? 'Leaving...' : 'Leave Trip'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleJoinTrip(trip.id)}
+                          disabled={joiningTrip === trip.id}
+                          className="flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium hover:bg-green-100 transition-colors"
+                        >
+                          {joiningTrip === trip.id ? (
+                            'Joining...'
+                          ) : (
+                            <>
+                              <UserPlus size={12} />
+                              Join Trip
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>

@@ -14,7 +14,8 @@ let trips: any[] = [
       { lat: 37.7748, lng: -122.4180 },
       // More route points would be here in a real application
     ],
-    previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+3b82f6(-122.4194,37.7749)/[-122.4194,37.7749,13]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg'
+    previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+3b82f6(-122.4194,37.7749)/[-122.4194,37.7749,13]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg',
+    joinedUsers: []
   },
   {
     id: 2,
@@ -29,7 +30,10 @@ let trips: any[] = [
       { lat: 37.82, lng: -122.32 },
       // More route points would be here in a real application
     ],
-    previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+3b82f6(-122.3,37.8)/[-122.3,37.8,11]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg'
+    previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+3b82f6(-122.3,37.8)/[-122.3,37.8,11]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg',
+    joinedUsers: [
+      { id: 'user1', name: 'John Doe' }
+    ]
   },
   {
     id: 3,
@@ -44,9 +48,16 @@ let trips: any[] = [
       { lat: 37.72, lng: -122.52 },
       // More route points would be here in a real application
     ],
-    previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+3b82f6(-122.5,37.7)/[-122.5,37.7,12]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg'
+    previewImageUrl: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+3b82f6(-122.5,37.7)/[-122.5,37.7,12]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg',
+    joinedUsers: []
   }
 ];
+
+// Current user mock
+const currentUser = {
+  id: 'user2', 
+  name: 'Jane Smith'
+};
 
 // Function to simulate API fetch delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -58,6 +69,7 @@ export const apiService = {
     await delay(500); // Simulate network delay
     return {
       status: 200,
+      ok: true,
       json: async () => ({ trips })
     };
   },
@@ -126,7 +138,8 @@ export const apiService = {
       difficulty,
       createdAt: new Date().toISOString(),
       // Generate a preview image URL (in a real app, this would use the actual route)
-      previewImageUrl: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+3b82f6(-122.4194,37.7749)/[-122.4194,37.7749,13]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg`
+      previewImageUrl: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+3b82f6(-122.4194,37.7749)/[-122.4194,37.7749,13]/300x200@2x?access_token=pk.eyJ1IjoibG92YWJsZWRldiIsImEiOiJjbDRxdnZ4aTgwYXBuM2pvMmdnd2o1cGU0In0.KvIV7XtKzlXjdvdj6P-5bg`,
+      joinedUsers: [] // Initialize with empty array of joined users
     };
     
     // Add to our in-memory store
@@ -138,6 +151,86 @@ export const apiService = {
       json: async () => ({ trip: newTrip, message: 'Trip created successfully' })
     };
   },
+
+  // Join a trip
+  joinTrip: async (tripId: number) => {
+    await delay(500);
+    
+    const tripIndex = trips.findIndex(t => t.id === tripId);
+    
+    if (tripIndex === -1) {
+      return {
+        status: 404,
+        ok: false,
+        json: async () => ({ message: 'Trip not found' })
+      };
+    }
+    
+    // Check if user has already joined this trip
+    const alreadyJoined = trips[tripIndex].joinedUsers.some(
+      (user: any) => user.id === currentUser.id
+    );
+    
+    if (alreadyJoined) {
+      return {
+        status: 400,
+        ok: false,
+        json: async () => ({ message: 'You have already joined this trip' })
+      };
+    }
+    
+    // Add current user to joinedUsers array
+    trips[tripIndex].joinedUsers.push({ ...currentUser });
+    
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({ 
+        trip: trips[tripIndex], 
+        message: 'You have successfully joined this trip' 
+      })
+    };
+  },
+  
+  // Leave a trip
+  leaveTrip: async (tripId: number) => {
+    await delay(500);
+    
+    const tripIndex = trips.findIndex(t => t.id === tripId);
+    
+    if (tripIndex === -1) {
+      return {
+        status: 404,
+        ok: false,
+        json: async () => ({ message: 'Trip not found' })
+      };
+    }
+    
+    // Check if user has already joined this trip
+    const userIndex = trips[tripIndex].joinedUsers.findIndex(
+      (user: any) => user.id === currentUser.id
+    );
+    
+    if (userIndex === -1) {
+      return {
+        status: 400,
+        ok: false,
+        json: async () => ({ message: 'You have not joined this trip' })
+      };
+    }
+    
+    // Remove current user from joinedUsers array
+    trips[tripIndex].joinedUsers.splice(userIndex, 1);
+    
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({ 
+        trip: trips[tripIndex], 
+        message: 'You have successfully left this trip' 
+      })
+    };
+  }
 };
 
 // Setup mocked fetch API for our endpoints
@@ -149,6 +242,18 @@ window.fetch = async (url: RequestInfo | URL, options?: RequestInit) => {
   
   // Handle API routes
   if (urlString.includes('/api/trips')) {
+    // Join trip endpoint
+    if (urlString.includes('/api/trips/join') && options?.method === 'POST') {
+      const requestData = JSON.parse(options.body as string);
+      return apiService.joinTrip(requestData.tripId) as Promise<Response>;
+    }
+    
+    // Leave trip endpoint
+    if (urlString.includes('/api/trips/leave') && options?.method === 'POST') {
+      const requestData = JSON.parse(options.body as string);
+      return apiService.leaveTrip(requestData.tripId) as Promise<Response>;
+    }
+    
     if (urlString === '/api/trips' && options?.method === 'POST') {
       // Create a new trip
       const tripData = JSON.parse(options.body as string);
