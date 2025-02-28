@@ -33,7 +33,7 @@ const libraries: ["places"] = ["places"];
 const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
   // Google Maps API loader
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'PROVIDE_API_KEY',
+    googleMapsApiKey: 'AIzaSyDG4EHLedn-u3JBm77ooQVcoVW5fSXFQkQ',
     libraries,
   });
 
