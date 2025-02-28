@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline, Autocomplete } from '@react-google-maps/api';
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { MapPin } from 'lucide-react';
+import { MapPin, AlertCircle } from 'lucide-react';
 
 // TypeScript interfaces
 interface MapRouteEditorProps {
@@ -30,10 +30,13 @@ const defaultCenter = {
 // Libraries to load
 const libraries: ["places"] = ["places"];
 
+// API key
+const GOOGLE_MAPS_API_KEY = 'AIzaSyDG4EHLedn-u3JBm77ooQVcoVW5fSXFQkQ';
+
 const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
   // Google Maps API loader
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: 'AIzaSyDG4EHLedn-u3JBm77ooQVcoVW5fSXFQkQ',
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries,
   });
 
@@ -45,6 +48,7 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
   const [routePath, setRoutePath] = useState<google.maps.LatLngLiteral[]>([]);
   const [markers, setMarkers] = useState<RouteMarker[]>([]);
   const [mapBounds, setMapBounds] = useState<google.maps.LatLngBounds | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   
   // Refs for autocomplete components
   const startAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -52,8 +56,15 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
 
   // Map load callback
   const onMapLoad = useCallback((map: google.maps.Map) => {
+    console.log("Map loaded successfully");
     setMap(map);
-    setDirectionsService(new google.maps.DirectionsService());
+    try {
+      const dirService = new google.maps.DirectionsService();
+      setDirectionsService(dirService);
+    } catch (err) {
+      console.error("Error creating directions service:", err);
+      setMapError("Failed to initialize directions service");
+    }
   }, []);
 
   // Helper function to create random markers along the route
@@ -79,48 +90,65 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
 
   // Function to calculate route
   const calculateRoute = useCallback(() => {
-    if (!directionsService || !startLocation || !endLocation) return;
+    if (!directionsService) {
+      toast.error("Maps service not available. Please try again later.");
+      return;
+    }
+    
+    if (!startLocation || !endLocation) {
+      toast.error("Please enter both start and end locations.");
+      return;
+    }
 
-    directionsService.route(
-      {
-        origin: startLocation,
-        destination: endLocation,
-        travelMode: google.maps.TravelMode.BICYCLING,
-      },
-      (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          const points: google.maps.LatLngLiteral[] = [];
-          const route = result.routes[0];
-          const path = route.overview_path;
-          
-          // Convert path to LatLngLiteral[]
-          path.forEach(point => {
-            points.push({ lat: point.lat(), lng: point.lng() });
-          });
-          
-          setRoutePath(points);
-          
-          // Create markers along the route
-          const newMarkers = createWaypointMarkers(points);
-          setMarkers(newMarkers);
-          
-          // Fit map to route bounds
-          if (map && route.bounds) {
-            map.fitBounds(route.bounds);
-            setMapBounds(route.bounds);
+    try {
+      directionsService.route(
+        {
+          origin: startLocation,
+          destination: endLocation,
+          travelMode: google.maps.TravelMode.BICYCLING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            const points: google.maps.LatLngLiteral[] = [];
+            const route = result.routes[0];
+            const path = route.overview_path;
+            
+            // Convert path to LatLngLiteral[]
+            path.forEach(point => {
+              points.push({ lat: point.lat(), lng: point.lng() });
+            });
+            
+            setRoutePath(points);
+            setMapError(null);
+            
+            // Create markers along the route
+            const newMarkers = createWaypointMarkers(points);
+            setMarkers(newMarkers);
+            
+            // Fit map to route bounds
+            if (map && route.bounds) {
+              map.fitBounds(route.bounds);
+              setMapBounds(route.bounds);
+            }
+            
+            // Callback with new route
+            if (onRouteChange) {
+              onRouteChange(points);
+            }
+            
+            toast.success("Route created successfully!");
+          } else {
+            console.error("Route calculation error:", status);
+            toast.error("Could not calculate route. Please try different locations.");
+            setMapError("Failed to calculate route between these locations.");
           }
-          
-          // Callback with new route
-          if (onRouteChange) {
-            onRouteChange(points);
-          }
-          
-          toast.success("Route created successfully!");
-        } else {
-          toast.error("Could not calculate route. Please try different locations.");
         }
-      }
-    );
+      );
+    } catch (error) {
+      console.error("Error calculating route:", error);
+      toast.error("An error occurred while creating the route.");
+      setMapError("Failed to access mapping service. Please try again later.");
+    }
   }, [directionsService, startLocation, endLocation, map, onRouteChange]);
 
   // Handle marker drag
@@ -138,41 +166,49 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
         stopover: false
       }));
       
-      directionsService.route(
-        {
-          origin: startLocation,
-          destination: endLocation,
-          waypoints: waypoints,
-          travelMode: google.maps.TravelMode.BICYCLING,
-          optimizeWaypoints: false
-        },
-        (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK && result) {
-            const points: google.maps.LatLngLiteral[] = [];
-            const route = result.routes[0];
-            const path = route.overview_path;
-            
-            path.forEach(point => {
-              points.push({ lat: point.lat(), lng: point.lng() });
-            });
-            
-            setRoutePath(points);
-            
-            // Callback with new route
-            if (onRouteChange) {
-              onRouteChange(points);
+      try {
+        directionsService.route(
+          {
+            origin: startLocation,
+            destination: endLocation,
+            waypoints: waypoints,
+            travelMode: google.maps.TravelMode.BICYCLING,
+            optimizeWaypoints: false
+          },
+          (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK && result) {
+              const points: google.maps.LatLngLiteral[] = [];
+              const route = result.routes[0];
+              const path = route.overview_path;
+              
+              path.forEach(point => {
+                points.push({ lat: point.lat(), lng: point.lng() });
+              });
+              
+              setRoutePath(points);
+              setMapError(null);
+              
+              // Callback with new route
+              if (onRouteChange) {
+                onRouteChange(points);
+              }
+            } else {
+              console.error("Route update error:", status);
+              toast.error("Could not update route with new waypoint");
             }
-          } else {
-            toast.error("Could not update route with new waypoint");
           }
-        }
-      );
+        );
+      } catch (error) {
+        console.error("Error updating route:", error);
+        toast.error("An error occurred while updating the route.");
+      }
     }
   }, [directionsService, startLocation, endLocation, markers, onRouteChange]);
 
   // Set up autocomplete refs when map is loaded
   useEffect(() => {
     if (isLoaded && !loadError) {
+      console.log("Google Maps API loaded successfully");
       // Set up autocomplete options when the component mounts
       const options = {
         types: ['address'],
@@ -187,6 +223,9 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
       if (endAutocompleteRef.current) {
         endAutocompleteRef.current.setOptions(options);
       }
+    } else if (loadError) {
+      console.error("Google Maps API load error:", loadError);
+      setMapError("Failed to load Google Maps. Please check your internet connection and try again.");
     }
   }, [isLoaded, loadError]);
 
@@ -194,7 +233,7 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
   const handleStartPlaceChanged = () => {
     if (startAutocompleteRef.current) {
       const place = startAutocompleteRef.current.getPlace();
-      if (place.name) {
+      if (place && place.name) {
         setStartLocation(place.name);
       }
     }
@@ -203,7 +242,7 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
   const handleEndPlaceChanged = () => {
     if (endAutocompleteRef.current) {
       const place = endAutocompleteRef.current.getPlace();
-      if (place.name) {
+      if (place && place.name) {
         setEndLocation(place.name);
       }
     }
@@ -211,11 +250,27 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
 
   // Loading and error states
   if (loadError) {
-    return <div className="p-4 bg-red-50 text-red-500 rounded-md">Error loading Google Maps API</div>;
+    return (
+      <div className="p-6 bg-red-50 text-red-600 rounded-md border border-red-200 flex items-center gap-3">
+        <AlertCircle size={20} />
+        <div>
+          <h3 className="font-medium">Error loading Google Maps</h3>
+          <p className="text-sm">The Google Maps API failed to load. Please check your internet connection or API key.</p>
+        </div>
+      </div>
+    );
   }
 
   if (!isLoaded) {
-    return <div className="p-4 flex justify-center">Loading Maps...</div>;
+    return (
+      <div className="p-12 flex justify-center items-center bg-gray-50 rounded-lg border border-gray-200">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-gray-300 rounded-full mb-4"></div>
+          <div className="h-4 w-24 bg-gray-300 rounded"></div>
+          <p className="mt-4 text-gray-500">Loading Maps...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -364,9 +419,19 @@ const MapRouteEditor: React.FC<MapRouteEditorProps> = ({ onRouteChange }) => {
         {routePath.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/80">
             <div className="text-center p-6 rounded-lg">
-              <MapPin className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-semibold text-gray-900">No route created</h3>
-              <p className="mt-1 text-sm text-gray-500">Enter start and end locations to generate a bike route.</p>
+              {mapError ? (
+                <>
+                  <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
+                  <h3 className="mt-2 text-sm font-semibold text-red-600">Oops! Something went wrong</h3>
+                  <p className="mt-1 text-sm text-red-500">{mapError}</p>
+                </>
+              ) : (
+                <>
+                  <MapPin className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-semibold text-gray-900">No route created</h3>
+                  <p className="mt-1 text-sm text-gray-500">Enter start and end locations to generate a bike route.</p>
+                </>
+              )}
             </div>
           </div>
         )}
