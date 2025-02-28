@@ -146,13 +146,14 @@ const Create = () => {
     // In a real app, we'd calculate these based on actual route data
     // For now, we'll generate reasonable mock values proportional to route length
     const pointCount = formData.route.length;
-    const mockDistance = (pointCount * 0.5).toFixed(1);
+    const distanceValue = pointCount * 0.5; // Store as number first
+    const mockDistance = distanceValue.toFixed(1);
     const mockDuration = Math.ceil(pointCount * 2.5);
     const mockElevation = Math.floor(pointCount * 10);
     
     let difficulty = 'Easy';
-    if (parseFloat(mockDistance) > 10) difficulty = 'Hard';
-    else if (parseFloat(mockDistance) > 5) difficulty = 'Moderate';
+    if (distanceValue > 10) difficulty = 'Hard';
+    else if (distanceValue > 5) difficulty = 'Moderate';
     
     return {
       distance: `${mockDistance} km`,
